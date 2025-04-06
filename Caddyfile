@@ -1,14 +1,14 @@
 {
-	admin off # theres no need for the admin api in railway's environment
-	persist_config off # storage isn't persistent anyway
-	auto_https off # railway handles https for us, this could in some cases cause issues if left enabled
-	# runtime logs
+	admin off
+	persist_config off
+	auto_https off
+
 	log {
-		format json # set runtime log format to json mode 
+		format json
 	}
-	# server options
+
 	servers {
-		trusted_proxies static private_ranges # trust railway's proxy
+		trusted_proxies static private_ranges
 	}
 }
 
@@ -26,49 +26,25 @@
 	unhealthy_request_count 200
 }
 
-# (cors_headers) {
-# 	header {
-# 		Access-Control-Allow-Origin "*"
-# 		Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-# 		Access-Control-Allow-Headers "*"
-# 		Access-Control-Max-Age "3600"
-# 	}
-# }
-
 :80, :443 {
-	# Enable logging
 	log {
 		output file /var/log/caddy/access.log
 		format console
 	}
 
-	# Handle /stub_status for metrics
 	handle /stub_status {
 		respond "OK" 200
 	}
 
 	handle /api/import/* {
-		# import cors_headers
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_APPFLOWY_CLOUD}
-				port {$ENV_APPFLOWY_CLOUD_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
-
+		reverse_proxy {$ENV_APPFLOWY_CLOUD}:{$ENV_APPFLOWY_CLOUD_PORT} {
 			header_up X-Request-Id {http.request.id}
 			header_up Host {http.request.host}
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {http.forward_for}
-			header_up X-Forwarded-Proto {http.request.scheme}
 
-			# configure load balancing settings
 			import lb_settings
-			# configure passive health checks
 			import passive_health_checks
-			# sets the Host header to the header to the dynamic name and port options
 			header_up Host {upstream_hostport}
 		}
 
@@ -77,18 +53,8 @@
 		}
 	}
 
-	# WebSocket
 	handle /ws/* {
-		# import cors_headers
-
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_APPFLOWY_CLOUD}
-				port {$ENV_APPFLOWY_CLOUD_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
+		reverse_proxy {$ENV_APPFLOWY_CLOUD}:{$ENV_APPFLOWY_CLOUD_PORT} {
 			header_up Host {host}
 			header_up Upgrade {http.request.header.Upgrade}
 			header_up Connection {http.request.header.Connection}
@@ -96,16 +62,7 @@
 	}
 
 	handle /api/chat/* {
-		# import cors_headers
-
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_APPFLOWY_CLOUD}
-				port {$ENV_APPFLOWY_CLOUD_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
+		reverse_proxy {$ENV_APPFLOWY_CLOUD}:{$ENV_APPFLOWY_CLOUD_PORT} {
 			header_up Host {host}
 			transport http {
 				response_header_timeout 600s
@@ -114,113 +71,47 @@
 	}
 
 	handle /api/* {
-		# import cors_headers
-
-		# proxy all requests for /api/* to the backend, configure this variable in the service settings
-		reverse_proxy {
-			# for private networking replicas are exposed as multiple dns results, use those dns results as the upstreams
-			dynamic a {
-				name {$ENV_APPFLOWY_CLOUD}
-				port {$ENV_APPFLOWY_CLOUD_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
-
+		reverse_proxy {$ENV_APPFLOWY_CLOUD}:{$ENV_APPFLOWY_CLOUD_PORT} {
 			header_up X-Request-Id {http.request.id}
 			header_up Host {http.request.host}
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {http.forward_for}
-			header_up X-Forwarded-Proto {http.request.scheme}
 
-			# configure load balancing settings
 			import lb_settings
-			# configure passive health checks
 			import passive_health_checks
-			# sets the Host header to the header to the dynamic name and port options
 			header_up Host {upstream_hostport}
 		}
 	}
 
-	# GoTrue
 	handle_path /gotrue/* {
-		# import cors_headers
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_GOTRUE}
-				port {$ENV_GOTRUE_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
+		reverse_proxy {$ENV_GOTRUE}:{$ENV_GOTRUE_PORT} {
 			header_up Host {http.request.host}
 			header_down +*
 		}
 	}
 
-	# Minio Web UI
 	handle_path /minio {
-		# import cors_headers
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_MINIO}
-				port {$ENV_MINIO_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
+		reverse_proxy {$ENV_MINIO}:{$ENV_MINIO_PORT} {
 			header_up Host {http.request.host}
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {http.forward_for}
-			header_up X-Forwarded-Proto {http.request.scheme}
 		}
 	}
 
-	# App Flowy AI
 	handle /ai/* {
-		# import cors_headers
-
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_APPFLOWY_AI}
-				port {$ENV_APPFLOWY_AI_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
+		reverse_proxy {$ENV_APPFLOWY_AI}:{$ENV_APPFLOWY_AI_PORT} {
 			header_up Host {http.request.host}
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {http.forward_for}
-			header_up X-Forwarded-Proto {http.request.scheme}
 		}
 	}
 
-	# Admin Frontend
 	handle {
-		# import cors_headers
-
-		reverse_proxy {
-			dynamic a {
-				name {$ENV_ADMIN_FRONTEND}
-				port {$ENV_ADMIN_FRONTEND_PORT}
-				refresh 1s
-				dial_timeout 30s
-				versions ipv4 ipv6
-			}
-			
-		}
+		reverse_proxy {$ENV_ADMIN_FRONTEND}:{$ENV_ADMIN_FRONTEND_PORT}
 	}
 
-	# Web App Hosted on railway
+	# Uncomment if using frontend app
 	# handle {
-	# 	reverse_proxy {
-	# 		dynamic a {
-	# 			name {$ENV_FRONTEND}
-	# 			port {$ENV_FRONTEND_PORT}
-	# 			refresh 1s
-	# 			dial_timeout 30s
-	# 			versions ipv4 ipv6
-	# 		}
-	# 	}
+	# 	reverse_proxy {$ENV_FRONTEND}:{$ENV_FRONTEND_PORT}
 	# }
 }
